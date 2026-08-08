@@ -19,7 +19,7 @@
   "author": "Ryan Sabin",
   "license": "Apache-2.0",
   "dependencies": {
-    "@abandonware/noble": "^1.9.2-25"
+    "@naugehyde/node-ble": "^1.13.5"
   },
   "repository": {
     "type": "git",

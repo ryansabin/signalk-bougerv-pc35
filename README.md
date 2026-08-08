@@ -20,11 +20,13 @@ the AC's native GATT protocol (reverse-engineered from the BougeRV app).
 
 ## Requirements
 
-- A BLE adapter on the Signal K host (built-in on Raspberry Pi).
-- Node needs raw BLE capability:
-  `sudo setcap cap_net_raw+eip $(eval readlink -f $(which node))`
+- A BLE adapter on the Signal K host (built-in on Raspberry Pi) with `bluetoothd`
+  running. Uses BlueZ over D-Bus (`@naugehyde/node-ble`), so it coexists with
+  other BlueZ users (no raw HCI, no `cap_net_raw`, no adapter takeover).
 - The AC allows only **one** BLE connection at a time — close the BougeRV phone
   app when this plugin is connected.
+- If you have more than one PC35 unit, set `address` in the config to pick the
+  right one (they all advertise as `PC35 PRO`).
 
 ## Config
 

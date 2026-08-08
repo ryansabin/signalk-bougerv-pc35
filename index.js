@@ -68,7 +68,7 @@ module.exports = function (app) {
     app.setPluginStatus(`Connected to ${dev.name} [${dev.addr}]`);
     log('CONNECTED to', dev.name, dev.addr);
     dev.onStatus(s => { log('status', JSON.stringify(s).slice(0,160)); emit(opts.basePath, s); });
-    dev.peripheral.once('disconnect', () => {
+    dev.onDisconnect(() => {
       app.setPluginStatus('AC disconnected — will retry');
       log('disconnected — will retry in 5s');
       dev = null;
