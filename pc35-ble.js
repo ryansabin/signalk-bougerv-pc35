@@ -87,8 +87,13 @@ async function findByName(adapter, prefix, deadline) {
 
 async function connect({ address = ADDR, namePrefix = NAME_PREFIX, timeoutMs = 30000 } = {}) {
   const { bluetooth, destroy } = createBluetooth();
-  const adapter = await bluetooth.defaultAdapter();
-  if (!(await adapter.isDiscovering())) await adapter.startDiscovery();
+  // defaultAdapter() can race D-Bus object enumeration at startup ("Adapter not found") — retry
+  let adapter;
+  for (let i = 0; ; i++) {
+    try { adapter = await bluetooth.defaultAdapter(); break; }
+    catch (e) { if (i >= 15) { try { destroy(); } catch (_) {} throw e; } await new Promise(r => setTimeout(r, 1000)); }
+  }
+  try { if (!(await adapter.isDiscovering())) await adapter.startDiscovery(); } catch (e) { /* already discovering (shared adapter) */ }
 
   let device, name = null, addr = (address || '').toUpperCase();
   if (addr) {

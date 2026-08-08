@@ -113,7 +113,11 @@ module.exports = function (app) {
       });
     }
 
-    ensureConnected(opts).catch(logErr);
+    const tryConnect = () => ensureConnected(opts).catch(e => {
+      logErr(e);
+      if (!stopped) reconnectTimer = setTimeout(tryConnect, 8000);
+    });
+    tryConnect();
     if (opts.pollSeconds > 0) {
       pollTimer = setInterval(() => { if (dev) dev.send(CMD.status()).catch(()=>{}); }, opts.pollSeconds * 1000);
     }
