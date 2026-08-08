@@ -37,7 +37,7 @@ const clamp = (n, lo, hi) => Math.max(lo, Math.min(hi, n | 0));
 
 const CMD = {
   power:  on   => frame(0x70, 1, on ? 1 : 0),
-  temp:   c    => frame(0x71, 0, clamp(c, 16, 31)),           // Celsius
+  temp:   c    => frame(0x71, 0, clamp(c, 16, 32)),           // Celsius (PC35 range 16-32)
   mode:   m    => frame(0x72, 0, m),
   fan:    f    => frame(0x73, 0, f),
   drainage: d  => frame(0x74, 1, d ? 1 : 0, [0xAA, 0xAA]),

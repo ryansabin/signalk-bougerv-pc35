@@ -53,6 +53,7 @@ module.exports = function (app) {
       { path: `${base}.fanSpeed`,       value: s.fan },
       { path: `${base}.drainage`,       value: s.drainage },
       { path: `${base}.lighting`,       value: s.lighting },
+      { path: `${base}.displayUnit`,    value: s.displayUnit },
     ];
     if (s.remainingMin != null) values.push({ path: `${base}.remainingTime`, value: s.remainingMin * 60 });
     app.handleMessage(plugin.id, { updates: [{ values }] });
@@ -92,6 +93,9 @@ module.exports = function (app) {
       }
       case 'mode': buf = CMD.mode(MODES[value] ?? Number(value)); break;
       case 'fanSpeed': buf = CMD.fan(FANS[value] ?? Number(value)); break;
+      case 'drainage': buf = CMD.drainage(value === true || value === 1 || value === 'open' || value === 'true'); break;
+      case 'lighting': buf = CMD.lighting(Number(value)); break;
+      case 'displayUnit': buf = CMD.tempUnit(value === 'F' || value === 1 || value === '1' || value === true ? 1 : 0); break;
       default: throw new Error('unknown control ' + kind);
     }
     await d.send(buf);
@@ -104,7 +108,7 @@ module.exports = function (app) {
     log('start()', JSON.stringify(options || {}));
     const opts = Object.assign({ basePath: 'electrical.airConditioner.pc35', namePrefix: 'PC35', pollSeconds: 30 }, options);
 
-    const controls = ['power', 'temperatureSet', 'mode', 'fanSpeed'];
+    const controls = ['power', 'temperatureSet', 'mode', 'fanSpeed', 'drainage', 'lighting', 'displayUnit'];
     for (const c of controls) {
       app.registerPutHandler('vessels.self', `${opts.basePath}.${c}`, (ctx, path, value, cb) => {
         put(opts, c, value)
