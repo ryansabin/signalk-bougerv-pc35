@@ -115,7 +115,7 @@ async function connect({ address = ADDR, namePrefix = NAME_PREFIX, timeoutMs = 3
 
   return {
     device, adapter, name, addr,
-    async send(buf) { await wchar.writeValue(buf, { type: 'command' }); },   // write-without-response
+    async send(buf) { await wchar.writeValue(buf, { type: 'request' }); },   // abf1 is write-WITH-response only
     onStatus(cb) { nchar.on('valuechanged', d => { const s = parseStatus(d); if (s) cb(s, d); }); },
     onDisconnect(cb) { try { device.once('disconnect', cb); } catch (e) {} },
     async disconnect() { try { await device.disconnect(); } catch (e) {} try { destroy(); } catch (e) {} },
