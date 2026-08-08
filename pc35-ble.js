@@ -106,6 +106,7 @@ async function connect({ address = ADDR, namePrefix = NAME_PREFIX, timeoutMs = 3
   const wchar = await service.getCharacteristic(CH_WRITE);
   const nchar = await service.getCharacteristic(CH_NOTIFY);
   await nchar.startNotifications();
+  if (process.env.PC35_DEBUG) nchar.on('valuechanged', d => console.error('RAW notify', d.length + 'B', d.toString('hex')));
 
   return {
     device, adapter, name, addr,
@@ -139,7 +140,7 @@ if (require.main === module) {
       case 'status': default: break;
     }
     await dev.send(CMD.status());
-    await once(1500);
+    await once(6000);
     console.log(JSON.stringify(out || {note:'no status frame received'}, null, 2));
     await dev.disconnect();
     process.exit(0);
