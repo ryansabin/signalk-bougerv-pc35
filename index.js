@@ -20,8 +20,6 @@
  */
 
 const { connect, CMD, MODES, FANS } = require('./pc35-ble');
-const fs = require('fs');
-const flog = (...a) => { try { fs.appendFileSync('/tmp/pc35.log', new Date().toISOString() + ' ' + a.join(' ') + '\n'); } catch (e) {} };
 
 module.exports = function (app) {
   let dev = null;
@@ -43,7 +41,7 @@ module.exports = function (app) {
     },
   };
 
-  const log = (...a) => { console.log('[pc35]', ...a); flog('[pc35]', ...a); };   // lifecycle logging (console + /tmp/pc35.log)
+  const log = (...a) => console.log('[pc35]', ...a);   // lifecycle logging (shown in SignalK plugin log)
   const K = c => c + 273.15;            // °C -> Kelvin
   const cFromK = k => k - 273.15;
 
@@ -69,7 +67,7 @@ module.exports = function (app) {
     dev = await connect({ timeoutMs: 30000 });
     app.setPluginStatus(`Connected to ${dev.name} [${dev.addr}]`);
     log('CONNECTED to', dev.name, dev.addr);
-    dev.onStatus(s => { log('status', JSON.stringify(s).slice(0,160)); emit(opts.basePath, s); });
+    dev.onStatus(s => { if (process.env.PC35_DEBUG) log('status', JSON.stringify(s).slice(0,160)); emit(opts.basePath, s); });
     dev.onDisconnect(() => {
       app.setPluginStatus('AC disconnected — will retry');
       log('disconnected — will retry in 5s');
@@ -80,7 +78,7 @@ module.exports = function (app) {
     return dev;
   }
 
-  function logErr(e){ flog('ERROR ' + (e && e.stack || e)); app.error(e.message); app.setPluginError(e.message); }
+  function logErr(e){ log('ERROR', e && e.message || e); app.error(e.message); app.setPluginError(e.message); }
 
   async function put(opts, kind, value) {
     const d = await ensureConnected(opts);
@@ -103,7 +101,7 @@ module.exports = function (app) {
 
   plugin.start = function (options) {
     stopped = false;
-    flog('=== start() called opts=' + JSON.stringify(options || {}));
+    log('start()', JSON.stringify(options || {}));
     const opts = Object.assign({ basePath: 'electrical.airConditioner.pc35', namePrefix: 'PC35', pollSeconds: 30 }, options);
 
     const controls = ['power', 'temperatureSet', 'mode', 'fanSpeed'];
