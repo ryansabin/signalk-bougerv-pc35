@@ -101,7 +101,7 @@ async function connect({ address = ADDR, namePrefix = NAME_PREFIX, timeoutMs = 3
   }
 
   await device.connect();
-  const gatt = await device.gattServer();
+  const gatt = await device.gatt();
   const service = await gatt.getPrimaryService(SVC);
   const wchar = await service.getCharacteristic(CH_WRITE);
   const nchar = await service.getCharacteristic(CH_NOTIFY);
