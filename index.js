@@ -20,6 +20,8 @@
  */
 
 const { connect, CMD, MODES, FANS } = require('./pc35-ble');
+const fs = require('fs');
+const flog = (...a) => { try { fs.appendFileSync('/tmp/pc35.log', new Date().toISOString() + ' ' + a.join(' ') + '\n'); } catch (e) {} };
 
 module.exports = function (app) {
   let dev = null;
@@ -41,7 +43,7 @@ module.exports = function (app) {
     },
   };
 
-  const log = (...a) => console.log('[pc35]', ...a);   // journald-visible lifecycle logging
+  const log = (...a) => { console.log('[pc35]', ...a); flog('[pc35]', ...a); };   // lifecycle logging (console + /tmp/pc35.log)
   const K = c => c + 273.15;            // °C -> Kelvin
   const cFromK = k => k - 273.15;
 
@@ -78,7 +80,7 @@ module.exports = function (app) {
     return dev;
   }
 
-  function logErr(e){ app.error(e.message); app.setPluginError(e.message); }
+  function logErr(e){ flog('ERROR ' + (e && e.stack || e)); app.error(e.message); app.setPluginError(e.message); }
 
   async function put(opts, kind, value) {
     const d = await ensureConnected(opts);
@@ -101,6 +103,7 @@ module.exports = function (app) {
 
   plugin.start = function (options) {
     stopped = false;
+    flog('=== start() called opts=' + JSON.stringify(options || {}));
     const opts = Object.assign({ basePath: 'electrical.airConditioner.pc35', namePrefix: 'PC35', pollSeconds: 30 }, options);
 
     const controls = ['power', 'temperatureSet', 'mode', 'fanSpeed'];
