@@ -85,24 +85,43 @@ async function findByName(adapter, prefix, deadline) {
   return null;
 }
 
-async function connect({ address = ADDR, namePrefix = NAME_PREFIX, timeoutMs = 30000 } = {}) {
+// Open ONE bluetooth session (D-Bus connection + adapter). Reuse it for the plugin's
+// lifetime — creating a new createBluetooth() per reconnect leaks D-Bus connections and
+// can wedge BlueZ / the adapter for the whole process (breaks other BLE plugins).
+async function openSession() {
   const { bluetooth, destroy } = createBluetooth();
-  // defaultAdapter() can race D-Bus object enumeration at startup ("Adapter not found") — retry
   let adapter;
   for (let i = 0; ; i++) {
-    try { adapter = await bluetooth.defaultAdapter(); break; }
-    catch (e) { if (i >= 15) { try { destroy(); } catch (_) {} throw e; } await new Promise(r => setTimeout(r, 1000)); }
+    try { adapter = await bluetooth.defaultAdapter(); break; }   // defaultAdapter() finds the controller regardless of hciN index
+    catch (e) { if (i >= 20) { try { destroy(); } catch (_) {} throw e; } await new Promise(r => setTimeout(r, 1000)); }
   }
-  try { if (!(await adapter.isDiscovering())) await adapter.startDiscovery(); } catch (e) { /* already discovering (shared adapter) */ }
+  return { bluetooth, adapter, destroy };
+}
 
+// Connect to the AC using an existing session. Only starts discovery if nothing else
+// is already discovering (so we don't fight bt-sensors), and never stops it.
+async function connectDevice(session, { address = ADDR, namePrefix = NAME_PREFIX, timeoutMs = 30000 } = {}) {
+  const adapter = session.adapter;
+  let ownedDiscovery = false;
   let device, name = null, addr = (address || '').toUpperCase();
-  if (addr) {
-    device = await adapter.waitDevice(addr, timeoutMs);
-    name = await device.getName().catch(() => null);
-  } else {
-    const found = await findByName(adapter, namePrefix, Date.now() + timeoutMs);
-    if (!found) { try { destroy(); } catch (e) {} throw new Error('scan timeout — AC not found (on? app closed? in range?)'); }
-    device = found.dev; addr = found.addr; name = found.name;
+  try {
+    if (addr) {
+      // Try the device directly first (BlueZ may already know it via a running scan) before starting our own.
+      try { device = await adapter.getDevice(addr); }
+      catch (e) {
+        if (!(await adapter.isDiscovering())) { await adapter.startDiscovery(); ownedDiscovery = true; }
+        device = await adapter.waitDevice(addr, timeoutMs);
+      }
+      name = await device.getName().catch(() => null);
+    } else {
+      if (!(await adapter.isDiscovering())) { await adapter.startDiscovery(); ownedDiscovery = true; }
+      const found = await findByName(adapter, namePrefix, Date.now() + timeoutMs);
+      if (!found) throw new Error('scan timeout — AC not found (on? app closed? in range?)');
+      device = found.dev; addr = found.addr; name = found.name;
+    }
+  } finally {
+    // if we started discovery just to find the device, stop it once done to leave the adapter as we found it
+    if (ownedDiscovery) { try { if (await adapter.isDiscovering()) await adapter.stopDiscovery(); } catch (e) {} }
   }
 
   await device.connect();
@@ -114,15 +133,26 @@ async function connect({ address = ADDR, namePrefix = NAME_PREFIX, timeoutMs = 3
   if (process.env.PC35_DEBUG) nchar.on('valuechanged', d => console.error('RAW notify', d.length + 'B', d.toString('hex')));
 
   return {
-    device, adapter, name, addr,
+    device, name, addr,
     async send(buf) { await wchar.writeValue(buf, { type: 'request' }); },   // abf1 is write-WITH-response only
     onStatus(cb) { nchar.on('valuechanged', d => { const s = parseStatus(d); if (s) cb(s, d); }); },
     onDisconnect(cb) { try { device.once('disconnect', cb); } catch (e) {} },
-    async disconnect() { try { await device.disconnect(); } catch (e) {} try { destroy(); } catch (e) {} },
+    async disconnect() { try { await device.disconnect(); } catch (e) {} },   // does NOT destroy the shared session
   };
 }
 
-module.exports = { connect, CMD, parseStatus, frame, MODES, FANS };
+// Standalone (CLI/tests): open a private session, destroyed on disconnect.
+async function connect(opts = {}) {
+  const session = await openSession();
+  let dev;
+  try { dev = await connectDevice(session, opts); }
+  catch (e) { try { session.destroy(); } catch (_) {} throw e; }
+  const orig = dev.disconnect.bind(dev);
+  dev.disconnect = async () => { await orig(); try { session.destroy(); } catch (_) {} };
+  return dev;
+}
+
+module.exports = { connect, openSession, connectDevice, CMD, parseStatus, frame, MODES, FANS };
 
 // ---- CLI --------------------------------------------------------------------
 if (require.main === module) {

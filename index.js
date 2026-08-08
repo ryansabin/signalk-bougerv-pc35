@@ -8,8 +8,7 @@
  *   cd signalk-bougerv-pc35 && npm install
  *   restart SignalK, enable the plugin in the admin UI.
  *
- * Needs BLE permission for node:
- *   sudo setcap cap_net_raw+eip $(eval readlink -f $(which node))
+ * Uses @naugehyde/node-ble (BlueZ/D-Bus) — coexists with bluetoothd and other BLE plugins.
  *
  * Exposes (under configurable base path, default electrical.airConditioner.pc35):
  *   .power           bool     PUT: true/false or 1/0
@@ -19,9 +18,10 @@
  *   .remainingTime   seconds
  */
 
-const { connect, CMD, MODES, FANS } = require('./pc35-ble');
+const { openSession, connectDevice, CMD, MODES, FANS } = require('./pc35-ble');
 
 module.exports = function (app) {
+  let session = null;   // ONE D-Bus/bluetooth session for the plugin's lifetime (reused across reconnects)
   let dev = null;
   let stopped = false;
   let pollTimer = null;
@@ -63,9 +63,13 @@ module.exports = function (app) {
     if (dev) return dev;
     if (opts.address) process.env.PC35_ADDR = opts.address;
     if (opts.namePrefix) process.env.PC35_NAME = opts.namePrefix;
+    // Open the bluetooth session ONCE, then reuse it for every (re)connect. Creating a new
+    // createBluetooth() per reconnect leaks D-Bus connections and churns the adapter, which
+    // previously wedged BlueZ and knocked bt-sensors-plugin-sk offline ("Adapter not found").
+    if (!session) session = await openSession();
     app.setPluginStatus('Scanning for PC35…');
     log('scanning for AC (namePrefix=' + (opts.namePrefix||'PC35') + ', address=' + (opts.address||'any') + ')');
-    dev = await connect({ timeoutMs: 30000 });
+    dev = await connectDevice(session, { address: opts.address, namePrefix: opts.namePrefix, timeoutMs: 30000 });
     app.setPluginStatus(`Connected to ${dev.name} [${dev.addr}]`);
     log('CONNECTED to', dev.name, dev.addr);
     dev.onStatus(s => { if (process.env.PC35_DEBUG) log('status', JSON.stringify(s).slice(0,160)); emit(opts.basePath, s); });
@@ -132,6 +136,7 @@ module.exports = function (app) {
     stopped = true;
     clearInterval(pollTimer); clearTimeout(reconnectTimer);
     if (dev) { dev.disconnect().catch(()=>{}); dev = null; }
+    if (session) { try { session.destroy(); } catch (e) {} session = null; }   // free the D-Bus session (the ONLY place we destroy it)
     app.setPluginStatus('Stopped');
   };
 
