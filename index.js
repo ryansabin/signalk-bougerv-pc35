@@ -41,6 +41,7 @@ module.exports = function (app) {
     },
   };
 
+  const log = (...a) => console.log('[pc35]', ...a);   // journald-visible lifecycle logging
   const K = c => c + 273.15;            // °C -> Kelvin
   const cFromK = k => k - 273.15;
 
@@ -62,11 +63,14 @@ module.exports = function (app) {
     if (opts.address) process.env.PC35_ADDR = opts.address;
     if (opts.namePrefix) process.env.PC35_NAME = opts.namePrefix;
     app.setPluginStatus('Scanning for PC35…');
+    log('scanning for AC (namePrefix=' + (opts.namePrefix||'PC35') + ', address=' + (opts.address||'any') + ')');
     dev = await connect({ timeoutMs: 30000 });
     app.setPluginStatus(`Connected to ${dev.name} [${dev.addr}]`);
-    dev.onStatus(s => emit(opts.basePath, s));
+    log('CONNECTED to', dev.name, dev.addr);
+    dev.onStatus(s => { log('status', JSON.stringify(s).slice(0,160)); emit(opts.basePath, s); });
     dev.peripheral.once('disconnect', () => {
       app.setPluginStatus('AC disconnected — will retry');
+      log('disconnected — will retry in 5s');
       dev = null;
       if (!stopped) reconnectTimer = setTimeout(() => ensureConnected(opts).catch(logErr), 5000);
     });
