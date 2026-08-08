@@ -1,0 +1,32 @@
+{
+  "name": "signalk-bougerv-pc35",
+  "version": "0.1.0",
+  "description": "Signal K plugin to monitor and control a BougeRV PC35 Pro portable air conditioner over BLE (power, temperature, mode, fan, drainage) with status reporting and PUT control",
+  "main": "index.js",
+  "scripts": {
+    "test": "node -e \"require('./index.js'); console.log('load OK');\""
+  },
+  "keywords": [
+    "signalk-node-server-plugin",
+    "signalk-category-utility",
+    "signalk-category-hardware",
+    "bougerv",
+    "pc35",
+    "air-conditioner",
+    "ble",
+    "bluetooth"
+  ],
+  "author": "Ryan Sabin",
+  "license": "Apache-2.0",
+  "dependencies": {
+    "@abandonware/noble": "^1.9.2-25"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ryansabin/signalk-bougerv-pc35.git"
+  },
+  "bugs": {
+    "url": "https://github.com/ryansabin/signalk-bougerv-pc35/issues"
+  },
+  "homepage": "https://github.com/ryansabin/signalk-bougerv-pc35#readme"
+}
